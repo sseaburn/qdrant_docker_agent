@@ -47,6 +47,7 @@ class ChatRequest(BaseModel):
 
 class Source(BaseModel):
     """Schema for source citation."""
+    document_id: str
     filename: str
     chunk_index: int
     text: str

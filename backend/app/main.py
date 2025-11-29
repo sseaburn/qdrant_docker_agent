@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.config import settings
-from backend.app.routers import documents
+from backend.app.routers import documents, chat
 
 app = FastAPI(
     title="RAG API",
@@ -12,6 +12,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(documents.router)
+app.include_router(chat.router)
 
 # Configure CORS
 origins = [origin.strip() for origin in settings.BACKEND_CORS_ORIGINS.split(",")]
