@@ -1,5 +1,7 @@
 """RAG Agent service for retrieval-augmented generation."""
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -9,6 +11,41 @@ try:
 except ImportError:
     from backend.app.services.vector_store import get_vector_store, SearchResult
     from backend.app.services.llm import get_llm_provider
+
+
+def _clean_chunk_text(text: str) -> str:
+    """Clean chunk text for LLM consumption."""
+    if not text:
+        return text
+
+    # Remove control characters
+    text = ''.join(char for char in text if unicodedata.category(char) != 'Cc' or char in '\n\r\t ')
+
+    # Fix ligature and font encoding issues
+    text_fixes = {
+        '/f_i': 'fi', '/f_l': 'fl', '/f_': 'f', '/T_': 'Th',
+        'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬀ': 'ff', 'ﬃ': 'ffi', 'ﬄ': 'ffl',
+        '/uni00A0': ' ',  # Non-breaking space escape
+        'Thhe': 'The',  # Common OCR error
+        'thhe': 'the',
+    }
+    for bad, good in text_fixes.items():
+        text = text.replace(bad, good)
+
+    # Remove unicode escape sequences like /uniXXXX
+    text = re.sub(r'/uni[0-9A-Fa-f]{4}', ' ', text)
+
+    # Normalize unicode
+    text = unicodedata.normalize('NFKC', text)
+
+    # Fix hyphenation at line breaks
+    text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)
+
+    # Normalize whitespace
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
 
 
 @dataclass
@@ -131,8 +168,10 @@ class RAGAgent:
 
         context_parts = []
         for i, result in enumerate(results, 1):
+            # Clean the text before including in context
+            cleaned_text = _clean_chunk_text(result.text)
             context_parts.append(
-                f"[Source {i}: {result.filename}]\n{result.text}"
+                f"[Source {i}: {result.filename}]\n{cleaned_text}"
             )
 
         return "\n\n".join(context_parts)

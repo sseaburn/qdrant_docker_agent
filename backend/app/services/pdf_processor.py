@@ -1,9 +1,55 @@
 """PDF processing service for text extraction and chunking."""
 
 import io
+import re
+import unicodedata
 from typing import List
 from pypdf import PdfReader
 import tiktoken
+
+
+def clean_text(text: str) -> str:
+    """
+    Clean extracted PDF text by fixing common extraction issues.
+
+    Args:
+        text: Raw extracted text from PDF.
+
+    Returns:
+        Cleaned text.
+    """
+    if not text:
+        return text
+
+    # Remove control characters (except newlines, tabs)
+    text = ''.join(char for char in text if unicodedata.category(char) != 'Cc' or char in '\n\r\t')
+
+    # Fix common ligature extraction issues
+    ligature_fixes = {
+        '/f_i': 'fi',
+        '/f_l': 'fl',
+        '/f_': 'f',
+        '/T_': 'Th',
+        'ﬁ': 'fi',
+        'ﬂ': 'fl',
+        'ﬀ': 'ff',
+        'ﬃ': 'ffi',
+        'ﬄ': 'ffl',
+    }
+    for bad, good in ligature_fixes.items():
+        text = text.replace(bad, good)
+
+    # Normalize unicode characters
+    text = unicodedata.normalize('NFKC', text)
+
+    # Fix hyphenation at line breaks (word-\n continuation)
+    text = re.sub(r'(\w+)-\s*\n\s*(\w+)', r'\1\2', text)
+
+    # Normalize whitespace
+    text = re.sub(r'[ \t]+', ' ', text)  # Multiple spaces/tabs to single space
+    text = re.sub(r'\n{3,}', '\n\n', text)  # Multiple newlines to double
+
+    return text.strip()
 
 
 def extract_text(file_content: bytes) -> str:
@@ -24,7 +70,8 @@ def extract_text(file_content: bytes) -> str:
         if page_text:
             text_parts.append(page_text)
 
-    return "\n".join(text_parts).strip()
+    raw_text = "\n".join(text_parts).strip()
+    return clean_text(raw_text)
 
 
 def count_tokens(text: str, encoding_name: str = "cl100k_base") -> int:

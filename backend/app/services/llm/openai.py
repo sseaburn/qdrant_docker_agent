@@ -12,9 +12,13 @@ from .base import LLMProvider
 
 
 # RAG prompt template
-RAG_PROMPT_TEMPLATE = """You are a helpful assistant that answers questions based on the provided context.
-Use only the information from the context to answer. If the answer is not in the
-context, say "I don't have enough information to answer that question."
+RAG_PROMPT_TEMPLATE = """You are a helpful assistant that answers questions based on the provided context from documents.
+
+Instructions:
+- Answer the question using information from the context below
+- Be helpful and provide relevant information even if the question isn't perfectly phrased
+- If the context contains relevant information, use it to construct a helpful answer
+- Only say you don't have information if the context truly contains nothing relevant to the question
 
 Context:
 {context}
